@@ -2,118 +2,167 @@ import React, { useState, useEffect } from 'react';
 import Sidebar from './Sidebar';
 import ChatWindow from './ChatWindow';
 import { chatAPI } from '../services/api';
+import { useAuth } from '../context/AuthContext';
 
 const Chat = () => {
   const [chatHistory, setChatHistory] = useState([]);
   const [currentChat, setCurrentChat] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [messages, setMessages] = useState([]);
+  const [isNewChat, setIsNewChat] = useState(true);
+  const { user } = useAuth();
 
+  // Load chat history from backend API
   useEffect(() => {
-    loadChatHistory();
-  }, []);
-
-  useEffect(() => {
-    // When currentChat changes, update messages to display it
-    if (currentChat) {
-      setMessages([
-        { 
-          id: `${currentChat.timestamp}-query`, 
-          content: currentChat.query, 
-          timestamp: currentChat.timestamp, 
-          isUser: true 
-        },
-        { 
-          id: `${currentChat.timestamp}-response`, 
-          content: currentChat.response, 
-          timestamp: currentChat.timestamp, 
-          isUser: false,
-          source: currentChat.source_document,
-          confidence: currentChat.confidence
-        }
-      ]);
-    } else {
-      // If no current chat selected, show all history as messages
-      transformChatHistoryToMessages();
+    if (user) {
+      loadChatHistory();
     }
-  }, [currentChat, chatHistory]);
+  }, [user]);
 
   const loadChatHistory = async () => {
     try {
+      console.log('Loading chat history for user:', user?.username);
       const response = await chatAPI.getHistory();
-      setChatHistory(response.data);
+      console.log('Backend chat history response:', response.data);
+      
+      // Ensure we have an array and sort by timestamp
+      const history = Array.isArray(response.data) ? response.data : [];
+      const sortedHistory = history.sort((a, b) => 
+        new Date(b.timestamp || b.createdAt) - new Date(a.timestamp || a.createdAt)
+      );
+      
+      setChatHistory(sortedHistory);
     } catch (error) {
-      console.error('Error loading chat history:', error);
+      console.error('Error loading chat history from backend:', error);
+      setChatHistory([]);
     }
   };
 
-  const transformChatHistoryToMessages = () => {
-    const transformedMessages = chatHistory.flatMap(chat => [
-      { 
-        id: `${chat.timestamp}-query`, 
-        content: chat.query, 
-        timestamp: chat.timestamp, 
-        isUser: true 
-      },
-      { 
-        id: `${chat.timestamp}-response`, 
-        content: chat.response, 
-        timestamp: chat.timestamp, 
-        isUser: false,
-        source: chat.source_document,
-        confidence: chat.confidence
+  // Transform current chat to messages when it changes
+  useEffect(() => {
+    if (currentChat) {
+      if (currentChat.messages && currentChat.messages.length > 0) {
+        setMessages(currentChat.messages);
+      } else {
+        const convertedMessages = [
+          { 
+            id: `${currentChat.timestamp}-query`, 
+            content: currentChat.query, 
+            timestamp: currentChat.timestamp, 
+            isUser: true 
+          },
+          { 
+            id: `${currentChat.timestamp}-response`, 
+            content: currentChat.response, 
+            timestamp: currentChat.timestamp, 
+            isUser: false,
+            source: currentChat.source_document,
+            confidence: currentChat.confidence
+          }
+        ];
+        setMessages(convertedMessages);
       }
-    ]);
-    setMessages(transformedMessages);
-  };
+      setIsNewChat(false);
+    } else if (isNewChat) {
+      setMessages([]);
+    }
+  }, [currentChat, isNewChat]);
 
-  const handleNewMessage = (newMessage) => {
-    const updatedHistory = [newMessage, ...chatHistory];
-    setChatHistory(updatedHistory);
-    
-    // Add the new message to the current messages view
-    const newMessages = [
-      { 
-        id: `${newMessage.timestamp}-query`, 
-        content: newMessage.query, 
-        timestamp: newMessage.timestamp, 
-        isUser: true 
-      },
-      { 
-        id: `${newMessage.timestamp}-response`, 
-        content: newMessage.response, 
-        timestamp: newMessage.timestamp, 
-        isUser: false,
-        source: newMessage.source_document,
+  const handleNewMessage = async (newMessage) => {
+    const userMessage = {
+      id: `${Date.now()}-user`,
+      content: newMessage.query,
+      timestamp: newMessage.timestamp,
+      isUser: true
+    };
+
+    const assistantMessage = {
+      id: `${Date.now()}-assistant`,
+      content: newMessage.response,
+      timestamp: newMessage.timestamp,
+      isUser: false,
+      source: newMessage.source_document,
+      confidence: newMessage.confidence
+    };
+
+    if (currentChat && !isNewChat) {
+      // Update existing chat
+      const updatedMessages = [
+        ...messages,
+        userMessage,
+        assistantMessage
+      ];
+
+      const updatedChat = {
+        ...currentChat,
+        messages: updatedMessages,
+        lastMessage: newMessage.query,
+        lastResponse: newMessage.response,
+        timestamp: newMessage.timestamp,
+        updatedAt: new Date().toISOString(),
+        query: currentChat.query || newMessage.query,
+        response: currentChat.response || newMessage.response,
+        source_document: newMessage.source_document,
         confidence: newMessage.confidence
-      }
-    ];
-    
-    setMessages(prev => [...prev, ...newMessages]);
+      };
+
+      const updatedHistory = chatHistory.map(chat => 
+        chat._id === currentChat._id ? updatedChat : chat
+      );
+      
+      setChatHistory(updatedHistory);
+      setCurrentChat(updatedChat);
+      setMessages(updatedMessages);
+      
+    } else {
+      // Create new chat
+      const newChat = {
+        query: newMessage.query,
+        response: newMessage.response,
+        lastMessage: newMessage.query,
+        timestamp: newMessage.timestamp,
+        source_document: newMessage.source_document,
+        confidence: newMessage.confidence,
+        messages: [userMessage, assistantMessage],
+      };
+
+      // Add to history and refresh from backend to get the actual saved chat
+      const updatedHistory = [newChat, ...chatHistory];
+      setChatHistory(updatedHistory);
+      setCurrentChat(newChat);
+      setIsNewChat(false);
+      setMessages([userMessage, assistantMessage]);
+      
+      // Reload history to get the properly saved chat from backend
+      setTimeout(() => {
+        loadChatHistory();
+      }, 500);
+    }
   };
 
   const handleSelectChat = (chat) => {
     setCurrentChat(chat);
+    setIsNewChat(false);
   };
 
   const handleDeleteChat = async (chatToDelete) => {
     try {
-      await chatAPI.deleteChat(chatToDelete._id);
-      const updatedHistory = chatHistory.filter(chat => chat._id !== chatToDelete._id);
-      setChatHistory(updatedHistory);
+      if (chatToDelete._id) {
+        await chatAPI.deleteChat(chatToDelete._id);
+      }
       
-      // If the deleted chat was the current one, clear it
+      // Reload history from backend after deletion
+      await loadChatHistory();
+      
       if (currentChat && currentChat._id === chatToDelete._id) {
         setCurrentChat(null);
+        setIsNewChat(true);
+        setMessages([]);
       }
     } catch (error) {
-      if (error.response?.status === 404) {
-        // Message already deleted, remove from frontend
-        const updatedHistory = chatHistory.filter(chat => chat._id !== chatToDelete._id);
-        setChatHistory(updatedHistory);
-      } else {
-        console.error('Error deleting chat:', error);
-      }
+      console.error('Error deleting chat:', error);
+      // Even if API call fails, update UI and reload history
+      await loadChatHistory();
     }
   };
 
@@ -123,38 +172,46 @@ const Chat = () => {
       setChatHistory([]);
       setCurrentChat(null);
       setMessages([]);
+      setIsNewChat(true);
     } catch (error) {
-      if (error.response?.status === 500) {
-        // Still clear from frontend even if backend fails
-        setChatHistory([]);
-        setCurrentChat(null);
-        setMessages([]);
-      } else {
-        console.error('Error clearing all chats:', error);
-      }
+      console.error('Error clearing all chats:', error);
+      // Update UI even if API call fails
+      setChatHistory([]);
+      setCurrentChat(null);
+      setMessages([]);
+      setIsNewChat(true);
     }
   };
 
+  const handleNewChat = () => {
+    setCurrentChat(null);
+    setIsNewChat(true);
+    setMessages([]);
+  };
+
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className="flex h-screen bg-gradient-to-br from-slate-50 to-blue-50">
       <Sidebar
         chatHistory={chatHistory}
         onSelectChat={handleSelectChat}
         currentChat={currentChat}
         onDeleteChat={handleDeleteChat}
         onClearAll={handleClearAll}
+        onNewChat={handleNewChat}
+        isNewChat={isNewChat}
         isOpen={sidebarOpen}
         onToggle={() => setSidebarOpen(!sidebarOpen)}
       />
       
-      {/* Main content area */}
       <div className={`flex-1 flex flex-col transition-all duration-300 ${
-        sidebarOpen ? 'ml-64' : 'ml-0'
+        sidebarOpen ? 'ml-80' : 'ml-0'
       }`}>
         <ChatWindow
           messages={messages}
           onNewMessage={handleNewMessage}
           currentChat={currentChat}
+          isNewChat={isNewChat}
+          onClearAll={handleClearAll}
         />
       </div>
     </div>
