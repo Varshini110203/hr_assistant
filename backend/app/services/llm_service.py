@@ -18,41 +18,72 @@ class LLMService:
         self.api_key = settings.GROQ_API_KEY
         self.model = settings.GROQ_MODEL if hasattr(settings, 'GROQ_MODEL') else "llama-3.1-8b-instant"
         
-    def generate_response(self, query: str, context: List[Tuple[str, float]]) -> str:
-        """Generate responses using Groq API with RAG context"""
+    def _extract_text_from_context(self, context_item) -> str:
+        """Extract text content from context item which could be string or dict"""
+        if isinstance(context_item, str):
+            return context_item
+        elif isinstance(context_item, dict):
+            # Try common keys that might contain text content
+            for key in ['content', 'text', 'document', 'page_content']:
+                if key in context_item:
+                    text = context_item[key]
+                    if isinstance(text, str):
+                        return text
+            # If no common keys found, convert dict to string
+            return str(context_item)
+        else:
+            return str(context_item)
+        
+    def _build_prompt(self, query: str, context: List[Tuple], version_context: str = "") -> str:
+        """Build prompt with context and version information for Groq API"""
+        
+        # Extract and process context content
+        context_texts = []
+        for doc in context[:3]:  # Take top 3 most relevant
+            if isinstance(doc, tuple) and len(doc) > 0:
+                content = self._extract_text_from_context(doc[0])
+                context_texts.append(content)
+            else:
+                content = self._extract_text_from_context(doc)
+                context_texts.append(content)
+        
+        context_str = "\n\n".join(context_texts)
+        
+        prompt = f"""You are an HR assistant. Answer the user's question based ONLY on the provided HR documents context. 
+    The system has automatically selected the most recent versions of relevant documents for you.
+
+    Document Versions Used:
+    {version_context}
+
+    HR Documents Context (from latest versions):
+    {context_str}
+
+    User Question: {query}
+
+    Important: 
+    - Base your answer ONLY on the provided context from the latest document versions
+    - If multiple policies exist, prioritize information from the most recent documents
+    - If the information is not in the context, politely say you don't have that specific information
+    """
+        
+        return prompt
+
+    def generate_response(self, query: str, context: List[Tuple], version_context: str = "") -> str:
+        """Generate responses using Groq API with RAG context and version info"""
         
         if not context:
             return "I couldn't find specific information about your question in our HR documents. Please contact the HR department directly for assistance, or try rephrasing your question."
         
-        # Build prompt with context
-        prompt = self._build_prompt(query, context)
+        # Build prompt with context and version info
+        prompt = self._build_prompt(query, context, version_context)
         
         # Call Groq API
-        response = self._call_grok_api(prompt)
+        response = self._call_groq_api(prompt)
         
-        logger.info("Generated response successfully using Groq")
+        logger.info("Generated response successfully using Groq with version-aware context")
         return response
 
-    def _build_prompt(self, query: str, context: List[Tuple[str, float]]) -> str:
-        """Build prompt with context for Groq API"""
-        
-        # Extract top context documents
-        context_texts = [doc[0] for doc in context[:3]]
-        context_str = "\n\n".join(context_texts)
-        
-        prompt = f"""You are an HR assistant. Answer the user's question based ONLY on the provided HR documents context. 
-If the information is not in the context, politely say you don't have that specific information in the HR documents.
-
-HR Documents Context:
-{context_str}
-
-User Question: {query}
-
-Please provide a helpful, accurate response based only on the HR documents above:"""
-        
-        return prompt
-
-    def _call_grok_api(self, prompt: str) -> str:
+    def _call_groq_api(self, prompt: str) -> str:
         """Call Groq API to generate response"""
         try:
             headers = {
