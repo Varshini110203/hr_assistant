@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordRequestForm
 from app.models.user import UserCreate, User, Token
 from app.models.chat import QueryRequest, QueryResponse
 from app.services.auth import AuthService
@@ -7,7 +8,6 @@ from app.core.security import create_access_token
 from app.api.dependencies import get_current_user
 from datetime import timedelta
 from app.core.config import settings
-from bson import ObjectId
 
 api_router = APIRouter()
 
@@ -24,18 +24,19 @@ def register(user_data: UserCreate):
         )
 
 @api_router.post("/login", response_model=Token)
-def login(username: str, password: str):
+def login(form_data: OAuth2PasswordRequestForm = Depends()):
     auth_service = AuthService()
-    user = auth_service.authenticate_user(username, password)
+    user = auth_service.authenticate_user(form_data.username, form_data.password)
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect username or password",
+            detail="Incorrect email or password",
         )
     
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    # Store email in JWT token (this is what get_current_user expects)
     access_token = create_access_token(
-        data={"sub": user.username}, expires_delta=access_token_expires
+        data={"sub": user.email}, expires_delta=access_token_expires
     )
     
     return {"access_token": access_token, "token_type": "bearer"}
@@ -46,7 +47,6 @@ def chat_query(request: QueryRequest, current_user: User = Depends(get_current_u
     chat_id = getattr(request, "chat_id", None)
     response = chat_service.process_query(str(current_user.id), chat_id, request.message)
     return response
-
 
 @api_router.get("/chat/history")
 def get_chat_history(current_user: User = Depends(get_current_user)):
@@ -89,7 +89,6 @@ def clear_all_chat_history(current_user: User = Depends(get_current_user)):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error clearing all chat conversations: {str(e)}"
         )
-
 
 @api_router.get("/user/me", response_model=User)
 def get_current_user_info(current_user: User = Depends(get_current_user)):

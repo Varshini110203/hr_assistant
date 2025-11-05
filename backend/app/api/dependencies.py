@@ -15,15 +15,18 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(securit
             headers={"WWW-Authenticate": "Bearer"},
         )
     
-    username: str = payload.get("sub")
-    if username is None:
+    email: str = payload.get("sub")
+    if email is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid authentication credentials",
         )
     
     auth_service = AuthService()
-    user = auth_service.get_user_by_username(username)
+    
+    # Get user by email (JWT sub contains email)
+    user = auth_service.get_user_by_email(email)
+    
     if user is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

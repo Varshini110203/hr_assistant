@@ -44,7 +44,13 @@ class AuthService:
         if self.users_collection is None:
             return None
             
-        user_data = self.users_collection.find_one({"username": username})
+        # Try to find user by username OR email
+        user_data = self.users_collection.find_one({
+            "$or": [
+                {"username": username},
+                {"email": username}
+            ]
+        })
         if not user_data:
             return None
         
@@ -74,6 +80,25 @@ class AuthService:
                 )
         except Exception as e:
             logger.error(f"Error getting user by ID: {str(e)}")
+            return None
+        return None
+
+    def get_user_by_email(self, email: str):
+        """Get user by email (synchronous)"""
+        if self.users_collection is None:
+            return None
+            
+        try:
+            user_data = self.users_collection.find_one({"email": email})
+            if user_data:
+                return User(
+                    id=str(user_data["_id"]),
+                    username=user_data["username"],
+                    email=user_data["email"],
+                    created_at=user_data["created_at"]
+                )
+        except Exception as e:
+            logger.error(f"Error getting user by email: {str(e)}")
             return None
         return None
 
