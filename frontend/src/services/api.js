@@ -17,9 +17,10 @@ api.interceptors.request.use((config) => {
 });
 
 export const chatAPI = {
-  sendMessage: (message) => api.post('/chat/query', { message }),
+  sendMessage: (message, chatId = null) =>api.post('/chat/query', { message, chat_id: chatId }),
+
   getHistory: () => api.get('/chat/history'),
-  deleteChat: (messageId) => api.delete(`/chat/history/${messageId}`),
+  deleteChat: (chatId) => api.delete(`/chat/${chatId}`),
   clearAllChats: () => api.delete('/chat/history'),
 };
 

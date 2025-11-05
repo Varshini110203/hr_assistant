@@ -15,54 +15,60 @@ const Sidebar = ({
   const { user, logout } = useAuth();
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
+  // Handle deleting chat
   const handleDeleteChat = (chat, e) => {
     e.stopPropagation();
     onDeleteChat(chat);
   };
 
-  const handleClearAll = () => {
-    setShowDeleteConfirm(true);
-  };
-
+  // Confirm clear all
   const confirmClearAll = () => {
     onClearAll();
     setShowDeleteConfirm(false);
   };
 
+  // Start new chat
   const handleNewChat = () => {
     onNewChat();
   };
 
+  // ✅ Display text fix: Show title or last user query
   const getChatDisplayText = (chat) => {
-    const displayText = chat.lastMessage || chat.query || 'New Chat';
-    return displayText.length > 28 
-      ? displayText.substring(0, 28) + '...' 
+    const latestMsg = chat.messages?.length
+      ? chat.messages[chat.messages.length - 1].content
+      : '';
+    const displayText = chat.title || latestMsg || 'New Chat';
+    return displayText.length > 40
+      ? displayText.substring(0, 40) + '...'
       : displayText;
   };
 
+  // ✅ Robust date formatter
   const formatDate = (timestamp) => {
     const date = new Date(timestamp);
-    const today = new Date();
-    const yesterday = new Date(today);
-    yesterday.setDate(yesterday.getDate() - 1);
+    if (isNaN(date.getTime())) return 'Recent Chats';
 
-    if (date.toDateString() === today.toDateString()) {
-      return 'Today';
-    } else if (date.toDateString() === yesterday.toDateString()) {
-      return 'Yesterday';
-    } else {
-      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-    }
+    const today = new Date();
+    const yesterday = new Date();
+    yesterday.setDate(today.getDate() - 1);
+
+    if (date.toDateString() === today.toDateString()) return 'Today';
+    if (date.toDateString() === yesterday.toDateString()) return 'Yesterday';
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   };
 
-  // Group chats by date
+  // ✅ Group chats by date (with fallbacks)
   const groupChatsByDate = () => {
     const groups = {};
-    chatHistory.forEach(chat => {
-      const date = formatDate(chat.timestamp);
-      if (!groups[date]) {
-        groups[date] = [];
-      }
+    const sortedChats = [...chatHistory].sort(
+      (a, b) =>
+        new Date(b.updated_at || b.created_at) -
+        new Date(a.updated_at || a.created_at)
+    );
+
+    sortedChats.forEach(chat => {
+      const date = formatDate(chat.updated_at || chat.created_at);
+      if (!groups[date]) groups[date] = [];
       groups[date].push(chat);
     });
     return groups;
@@ -70,6 +76,7 @@ const Sidebar = ({
 
   const groupedChats = groupChatsByDate();
 
+  // Sidebar collapsed view
   if (!isOpen) {
     return (
       <button
@@ -103,7 +110,7 @@ const Sidebar = ({
             </svg>
           </button>
         </div>
-        
+
         {/* New Chat Button */}
         <button
           onClick={handleNewChat}
@@ -120,7 +127,7 @@ const Sidebar = ({
         </button>
       </div>
 
-      {/* Chat History Section */}
+      {/* Chat History */}
       <div className="flex-1 overflow-y-auto">
         <div className="p-4">
           {Object.keys(groupedChats).map((date) => (
@@ -129,23 +136,23 @@ const Sidebar = ({
                 {date}
               </h3>
               <div className="space-y-1">
-                {groupedChats[date].map((chat, index) => (
+                {groupedChats[date].map((chat) => (
                   <div
-                    key={chat._id || index}
+                    key={chat._id}
+                    onClick={() => onSelectChat(chat)}
                     className={`group relative p-2 rounded-lg cursor-pointer transition-colors ${
-                      currentChat?._id === chat._id 
-                        ? 'bg-gray-700 text-white' 
+                      currentChat?._id === chat._id
+                        ? 'bg-gray-700 text-white'
                         : 'text-gray-400 hover:bg-gray-800 hover:text-gray-300'
                     }`}
-                    onClick={() => onSelectChat(chat)}
                   >
                     <div className="pr-6">
                       <div className="text-sm font-normal mb-1 leading-tight">
                         {getChatDisplayText(chat)}
                       </div>
                     </div>
-                    
-                    {/* Delete button */}
+
+                    {/* Delete Button */}
                     <button
                       onClick={(e) => handleDeleteChat(chat, e)}
                       className="absolute right-2 top-1/2 transform -translate-y-1/2 opacity-0 group-hover:opacity-100 text-gray-500 hover:text-red-400 p-1 rounded transition-colors"
@@ -160,7 +167,8 @@ const Sidebar = ({
               </div>
             </div>
           ))}
-          
+
+          {/* No chats message */}
           {chatHistory.length === 0 && (
             <div className="text-center py-8">
               <div className="w-12 h-12 bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-3">
@@ -174,11 +182,11 @@ const Sidebar = ({
         </div>
       </div>
 
-      {/* Clear All Button */}
+      {/* Clear All */}
       {chatHistory.length > 0 && (
         <div className="p-4 border-t border-gray-700">
           <button
-            onClick={handleClearAll}
+            onClick={() => setShowDeleteConfirm(true)}
             className="w-full text-gray-400 hover:text-red-400 text-sm font-medium transition-colors py-2"
           >
             Clear all conversations
@@ -186,7 +194,7 @@ const Sidebar = ({
         </div>
       )}
 
-      {/* Delete Confirmation Modal */}
+      {/* Clear All Modal */}
       {showDeleteConfirm && (
         <div className="absolute inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
           <div className="bg-gray-800 rounded-lg p-4 max-w-sm w-full">

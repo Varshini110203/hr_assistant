@@ -38,7 +38,7 @@ def get_users_collection():
         return db.db.users
     return None
 
-def get_messages_collection():
+def get_chats_collection():
     if db.db is not None:
-        return db.db.messages
+        return db.db.chats
     return None

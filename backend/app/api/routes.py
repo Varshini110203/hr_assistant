@@ -43,8 +43,10 @@ def login(username: str, password: str):
 @api_router.post("/chat/query", response_model=QueryResponse)
 def chat_query(request: QueryRequest, current_user: User = Depends(get_current_user)):
     chat_service = ChatService()
-    response = chat_service.process_query(current_user.id, request.message)
+    chat_id = getattr(request, "chat_id", None)
+    response = chat_service.process_query(str(current_user.id), chat_id, request.message)
     return response
+
 
 @api_router.get("/chat/history")
 def get_chat_history(current_user: User = Depends(get_current_user)):
@@ -52,41 +54,42 @@ def get_chat_history(current_user: User = Depends(get_current_user)):
     history = chat_service.get_chat_history(current_user.id)
     return history
 
-@api_router.delete("/chat/history/{message_id}")
-def delete_chat_message(message_id: str, current_user: User = Depends(get_current_user)):
-    """Delete a specific chat message by ID"""
+@api_router.delete("/chat/{chat_id}")
+def delete_chat(chat_id: str, current_user: User = Depends(get_current_user)):
+    """Delete an entire chat conversation"""
     chat_service = ChatService()
     try:
-        success = chat_service.delete_message(current_user.id, message_id)
+        success = chat_service.delete_chat(str(current_user.id), chat_id)
         if not success:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Message not found"
+                detail="Chat not found"
             )
-        return {"message": "Chat message deleted successfully"}
+        return {"message": "Chat deleted successfully"}
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error deleting message: {str(e)}"
+            detail=f"Error deleting chat: {str(e)}"
         )
 
 @api_router.delete("/chat/history")
 def clear_all_chat_history(current_user: User = Depends(get_current_user)):
-    """Clear all chat history for the current user"""
+    """Clear all chat conversations for the current user"""
     chat_service = ChatService()
     try:
-        success = chat_service.clear_user_history(current_user.id)
+        success = chat_service.clear_all_chats(str(current_user.id))
         if not success:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to clear chat history"
+                detail="Failed to clear all chat conversations"
             )
-        return {"message": "All chat history cleared successfully"}
+        return {"message": "All chat conversations cleared successfully"}
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error clearing chat history: {str(e)}"
+            detail=f"Error clearing all chat conversations: {str(e)}"
         )
+
 
 @api_router.get("/user/me", response_model=User)
 def get_current_user_info(current_user: User = Depends(get_current_user)):
