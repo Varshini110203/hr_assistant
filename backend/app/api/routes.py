@@ -45,21 +45,55 @@ def login(form_data: OAuth2PasswordRequestForm = Depends()):
 def chat_query(request: QueryRequest, current_user: User = Depends(get_current_user)):
     chat_service = ChatService()
     chat_id = getattr(request, "chat_id", None)
-    response = chat_service.process_query(str(current_user.id), chat_id, request.message)
+    
+    # Convert user ID to string for the chat service
+    user_id_str = str(current_user.id)
+    
+    response = chat_service.process_query(user_id_str, chat_id, request.message)
     return response
 
 @api_router.get("/chat/history")
 def get_chat_history(current_user: User = Depends(get_current_user)):
     chat_service = ChatService()
-    history = chat_service.get_chat_history(current_user.id)
+    
+    # Convert user ID to string for the chat service
+    user_id_str = str(current_user.id)
+    
+    history = chat_service.get_chat_history(user_id_str)
     return history
+
+@api_router.get("/chat/{chat_id}")
+def get_chat(chat_id: str, current_user: User = Depends(get_current_user)):
+    """Get a specific chat by ID"""
+    chat_service = ChatService()
+    
+    # Convert user ID to string for the chat service
+    user_id_str = str(current_user.id)
+    
+    try:
+        chat = chat_service.get_chat(user_id_str, chat_id)
+        if not chat:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Chat not found"
+            )
+        return chat
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error fetching chat: {str(e)}"
+        )
 
 @api_router.delete("/chat/{chat_id}")
 def delete_chat(chat_id: str, current_user: User = Depends(get_current_user)):
     """Delete an entire chat conversation"""
     chat_service = ChatService()
+    
+    # Convert user ID to string for the chat service
+    user_id_str = str(current_user.id)
+    
     try:
-        success = chat_service.delete_chat(str(current_user.id), chat_id)
+        success = chat_service.delete_chat(user_id_str, chat_id)
         if not success:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -76,19 +110,25 @@ def delete_chat(chat_id: str, current_user: User = Depends(get_current_user)):
 def clear_all_chat_history(current_user: User = Depends(get_current_user)):
     """Clear all chat conversations for the current user"""
     chat_service = ChatService()
+    
+    # Convert user ID to string for the chat service
+    user_id_str = str(current_user.id)
+    
     try:
-        success = chat_service.clear_all_chats(str(current_user.id))
-        if not success:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to clear all chat conversations"
-            )
-        return {"message": "All chat conversations cleared successfully"}
+        deleted_count = chat_service.clear_all_chats(user_id_str)
+        return {"message": f"Successfully cleared {deleted_count} chat conversations"}
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error clearing all chat conversations: {str(e)}"
         )
+
+@api_router.get("/system/status")
+def get_system_status(current_user: User = Depends(get_current_user)):
+    """Get system status and document processing information"""
+    chat_service = ChatService()
+    status_info = chat_service.get_system_status()
+    return status_info
 
 @api_router.get("/user/me", response_model=User)
 def get_current_user_info(current_user: User = Depends(get_current_user)):

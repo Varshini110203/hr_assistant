@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List, Dict, Any
 from datetime import datetime
 
 class QueryRequest(BaseModel):
@@ -16,3 +16,10 @@ class ChatMessage(BaseModel):
     query: str
     response: str
     timestamp: datetime
+
+class SearchResult(BaseModel):
+    content: str
+    confidence: float
+    document_name: str
+    modified_date: str
+    is_most_recent: bool
