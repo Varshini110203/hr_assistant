@@ -64,11 +64,20 @@ export function AuthProvider({ children }) {
     setUser(null);
   };
 
+  const resetPassword = async (token, newPassword) => {
+  try {
+    const response = await authAPI.resetPassword(token, newPassword);
+    return response.data;
+  } catch (error) {
+    throw error;
+  }
+};
   const value = {
     user,
     login,
     register,
     logout,
+    resetPassword, // Add this line to include the function in context
     loading
   };
 

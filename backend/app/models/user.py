@@ -19,3 +19,17 @@ class User(UserBase):
 class Token(BaseModel):
     access_token: str
     token_type: str
+
+# Add password reset models
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+class ForgotPasswordResponse(BaseModel):
+    message: str
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str
+
+class ResetPasswordResponse(BaseModel):
+    message: str

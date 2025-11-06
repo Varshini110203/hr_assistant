@@ -4,6 +4,8 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import Login from './components/Login';
 import Register from './components/Register';
 import Chat from './components/Chat';
+import ForgotPassword from './components/ForgotPassword';
+
 
 // Simple wrapper for protected routes
 function ChatRoute() {
@@ -64,6 +66,7 @@ function App() {
             />
             <Route path="/chat" element={<ChatRoute />} />
             <Route path="/" element={<Navigate to="/chat" />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
           </Routes>
         </div>
       </Router>

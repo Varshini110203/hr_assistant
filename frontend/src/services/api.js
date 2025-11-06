@@ -30,7 +30,7 @@ api.interceptors.response.use(
 export const authAPI = {
   login: async (email, password) => {
     const formData = new URLSearchParams();
-    formData.append('username', email); // FastAPI OAuth2 expects 'username' field
+    formData.append('username', email);
     formData.append('password', password);
     
     return api.post('/login', formData, {
@@ -42,6 +42,13 @@ export const authAPI = {
 
   register: async (userData) => {
     return api.post('/register', userData);
+  },
+
+  resetPassword: async (token, newPassword) => {
+    return api.post('/auth/reset-password', { 
+      token, 
+      new_password: newPassword 
+    });
   },
 };
 
