@@ -95,14 +95,20 @@ CRITICAL INSTRUCTIONS:
    - If asking "previous version of X", use OLDER documents and specify they are from previous versions
    - If asking about changes/differences, compare across versions and highlight what changed
 
-3. RESPONSE STRUCTURE:
+3. Instructions
    - Start with direct answer to the question
    - Specify which version(s) you're referencing
    - If multiple versions exist, mention the differences
    - If information conflicts between versions, note this and prioritize recent versions
    - Be transparent about version sources
+   - Do not give relevance scores and confidence levels in the final answer
 
-4. If information is missing from documents, say so and specify which aspects are unavailable."""
+4. ANSWER FORMAT:
+- Start with direct answer to the question
+- Brief context if needed.
+- If information conflicts between versions, note this and prioritize recent versions
+
+5. If information is missing from documents, say so and specify which aspects are unavailable."""
 
         return prompt
 
