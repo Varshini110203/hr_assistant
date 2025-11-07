@@ -72,7 +72,7 @@ class LLMService:
         if version_mentions:
             version_summary = "Documents found in search:\n" + "\n".join(version_mentions)
         
-        prompt = f"""You are an HR assistant analyzing multiple versions of HR documents. Answer the user's question based on the provided content.
+        prompt = f"""You are a helpful policy assistant. Based EXCLUSIVELY on the following policy context, please answer the user's question in a clear, concise manner.
 
 USER QUESTION: {query}
 
@@ -98,6 +98,9 @@ CRITICAL INSTRUCTIONS:
 3. Instructions
    - Start with direct answer to the question
    - Specify which version(s) you're referencing
+   - Provide ONE clear, comprehensive answer that best addresses the question from the latest and most relevant documents
+   - Use natural, conversational language - bullet points or numbered lists
+   - Do NOT mention sources, page numbers, or use [SOURCE] markers in your response
    - If multiple versions exist, mention the differences
    - If information conflicts between versions, note this and prioritize recent versions
    - Be transparent about version sources
